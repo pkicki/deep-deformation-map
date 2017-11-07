@@ -16,7 +16,7 @@ data_pro = init_data_provider()
 
 
 def init_images_provider():
-    images_provider = SequenceImagesProvider(sequence_path="output.mp4")
+    images_provider = SequenceImagesProvider(sequence_path="output.avi")
     return images_provider
 data_img = init_images_provider()
 
@@ -29,5 +29,7 @@ data_img = init_images_provider()
 
 # test
 tester = MBTester(data_provider=data_img,
-                  net_name="trained_net.meta.meta")
+                  net_name="trained_net.meta.meta",
+                  test_method="file",
+                  output_path="../data/")
 tester.test()

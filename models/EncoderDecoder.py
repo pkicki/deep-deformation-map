@@ -5,6 +5,10 @@ import math
 
 class Normal:
     def __init__(self, input_output_size=(320, 240, 3)):
+        """
+        Encoder-decoder net for unsupervised learning.
+        :param input_output_size: size of input image
+        """
         self.IMG_WIDTH = input_output_size[0]
         self.IMG_HEIGHT = input_output_size[1]
         self.IMG_CHANNELS = input_output_size[2]
