@@ -10,9 +10,12 @@ class Normal:
         self.IMG_CHANNELS = input_output_size[2]
 
         # Input and target placeholders
-        self.inputs1 = tf.placeholder(tf.float32, (None, self.IMG_WIDTH, self.IMG_HEIGHT, self.IMG_CHANNELS), name="input1")
-        self.inputs2 = tf.placeholder(tf.float32, (None, self.IMG_WIDTH, self.IMG_HEIGHT, self.IMG_CHANNELS), name="input2")
-        self.target = tf.placeholder(tf.float32, (None, self.IMG_WIDTH, self.IMG_HEIGHT, self.IMG_CHANNELS), name="prediction")
+        self.inputs1 = tf.placeholder(tf.float32, (None, self.IMG_HEIGHT, self.IMG_WIDTH, self.IMG_CHANNELS), name="input1")
+        self.inputs2 = tf.placeholder(tf.float32, (None, self.IMG_HEIGHT, self.IMG_WIDTH, self.IMG_CHANNELS), name="input2")
+        # self.target = tf.placeholder(tf.float32, (None, self.IMG_WIDTH, self.IMG_HEIGHT, self.IMG_CHANNELS), name="prediction")
+
+        self.norm = 0
+        self.model_initialized = False
 
     @staticmethod
     def encode(self, inputs):
@@ -40,36 +43,35 @@ class Normal:
     def decode(self, inputs):
         with tf.variable_scope("upsample"):
             ### Decoder
-            upsample1 = tf.image.resize_images(inputs, size=(80, 60), method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+            upsample1 = tf.image.resize_images(inputs, size=(60, 80), method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
 
         with tf.variable_scope("conv4"):
             # Now 80x60x8
             conv4 = tf.layers.conv2d(inputs=upsample1, filters=8, kernel_size=(3, 3), padding='same', activation=tf.nn.relu)
             # Now 80x60x8
-            upsample2 = tf.image.resize_images(conv4, size=(160, 120), method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+            upsample2 = tf.image.resize_images(conv4, size=(120, 160), method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
 
         with tf.variable_scope("conv5"):
             # Now 160x120x8
             conv5 = tf.layers.conv2d(inputs=upsample2, filters=8, kernel_size=(3, 3), padding='same', activation=tf.nn.relu)
             # Now 160x120x8
-            upsample3 = tf.image.resize_images(conv5, size=(320, 240), method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+            upsample3 = tf.image.resize_images(conv5, size=(240, 320), method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
 
         with tf.variable_scope("conv6"):
             # Now 320x240x8
-            conv6 = tf.layers.conv2d(inputs=upsample3, filters=16, kernel_size=(3, 3), padding='same',
-                                 activation=tf.nn.relu)
+            conv6 = tf.layers.conv2d(inputs=upsample3, filters=16, kernel_size=(3, 3), padding='same', activation=tf.nn.relu)
 
         with tf.variable_scope("result_decoded"):
             # Now 320x240x16
             logits = tf.layers.conv2d(inputs=conv6, filters=3, kernel_size=(3, 3), padding='same', activation=None)
 
             # Now 320x240x3
-            # Pass logits through sigmoid to get reconstructed image
-            decoded = tf.nn.sigmoid(logits)
+            # Pass logits through tanh to get reconstructed image
+            decoded = tf.nn.tanh(logits)
 
         return decoded
 
-    def get(self):
+    def init_structure(self):
 
         # share weights and biases while encoding
         with tf.variable_scope("image_filters") as scope:
@@ -79,8 +81,21 @@ class Normal:
 
         # diff latent vectors
         diff = tf.subtract(encoded_1, encoded_2)
+        self.norm = tf.norm(diff, ord='euclidean', name='norm')
+        self.model_initialized = True
 
-        # encde difference
-        decoded = self.decode(self, inputs=diff)
+        dropout = tf.layers.dropout(diff, rate=0.5)
 
-        return decoded
+        # encode difference
+        decoded = self.decode(self, inputs=dropout)
+
+        return [decoded]
+
+    def __call__(self, sess, feed, evaluation):
+        return sess.run([evaluation], feed_dict={self.inputs1: feed[0], self.inputs2: feed[1]})
+
+    def get_value_to_minimize(self):
+        if self.model_initialized:
+            return self.norm
+        else:
+            raise Exception("Model is not initialized. Nothing to optimize!")
