@@ -27,6 +27,9 @@ class MBTester:
             return_img = self.flownet_provider(img0=ref_img, img1=frame)
             return_img = np.array(return_img)
 
+
+            # TODO: convert return_img (240x320x2 -> 320x240x3 or 1)
+
             cv2.imshow("test", return_img)
             cv2.waitKey(0)
 
