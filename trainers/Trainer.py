@@ -43,7 +43,7 @@ class MbTrainer:
 
                     # return_val = self.model(sess, [train_img[:, 0], train_img[:, 1], train_out], [train_step, cost])
                     return_val = self.model(sess, [train_img[:, 0], train_img[:, 1]], [train_step, cost, io_ops])
-                    print("Step: " + str(step) + " Cost: " + str(return_val[0][1]) + " Out: " + str(return_val[0][2]))
+                    print("Step: " + str(step) + " Cost: " + str(return_val[0][1]))
 
                 else:
                     # summary = self.model(sess, [train_img[:, 0], train_img[:, 1], train_out], [merged])

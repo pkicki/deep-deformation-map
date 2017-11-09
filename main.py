@@ -16,16 +16,16 @@ data_pro = init_data_provider()
 
 
 def init_images_provider():
-    images_provider = SequenceImagesProvider(sequence_path="output.avi")
+    images_provider = SequenceImagesProvider(sequence_path="shirt.mp4")
     return images_provider
 data_img = init_images_provider()
 
-# # train
+# train
 # trainer = MbTrainer(model=Normal(),
 #                     data_provider=data_pro,
 #                     output_net_name="trained_net.meta",
 #                     logs_dir="./logs")
-# trainer.train(1000, 10000)
+# trainer.train(1000, 500000)
 
 # test
 tester = MBTester(data_provider=data_img,
