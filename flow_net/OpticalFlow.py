@@ -1,13 +1,10 @@
-#!/usr/bin/env python2.7
-
 from __future__ import print_function
 
 import numpy as np
-from scipy import misc
 import caffe
 import tempfile
 from math import ceil
-
+import cv2
 
 class Flow:
 
@@ -25,12 +22,25 @@ class Flow:
 
         # container for caffe model
         self.net = []
-
+        self.initialized = False
         self.input_dict = {}
+
+        print("Set GPU id: %d" % self.args.gpu)
+        caffe.set_device(self.args.gpu)
+
+        # setup caffe model
+        print("Setup caffe model")
+        if not self.args.verbose:
+            caffe.set_logging_disabled()
+
+        print("Set GPU mode")
+        caffe.set_mode_gpu()
+
         print("End init")
 
     def setup_images(self, img0, img1):
 
+        self.input_data = []
         if len(img0.shape) < 3:
             self.input_data.append(img0[np.newaxis, np.newaxis, :, :])
         else:
@@ -54,10 +64,10 @@ class Flow:
         self.vars['SCALE_WIDTH'] = self.width / float(self.vars['ADAPTED_WIDTH'])
         self.vars['SCALE_HEIGHT'] = self.height / float(self.vars['ADAPTED_HEIGHT'])
 
-        print("Setup images")
+        print("=========== images set ===========")
 
     def read_net(self):
-        # read net and store it in copy tmp?
+
         proto = open(self.args.deployproto).readlines()
         for line in proto:
             for key, value in self.vars.items():
@@ -65,39 +75,37 @@ class Flow:
                 line = line.replace(tag, str(value))
             self.tmp.write(line)
         self.tmp.flush()
-
         print("Read net")
 
     def setup_model(self):
 
-        # setup caffe model
-        print("Setup caffe model")
-        if not self.args.verbose:
-            caffe.set_logging_disabled()
-
-        print("Set GPU id: %d" % self.args.gpu)
-        caffe.set_device(self.args.gpu)
-
-        print("Set GPU mode")
-        caffe.set_mode_gpu()
-
         print("Create caffe net: %s" % self.tmp.name)
         self.net = caffe.Net(self.tmp.name, self.args.caffemodel, caffe.TEST)
-
         print("Setup model")
 
     def setup_feed_dict(self):
+
         # setup feed dict for cafe model
-        for blob_idx in range(self.num_blobs):
-            self.input_dict[self.net.inputs[blob_idx]] = self.input_data[blob_idx]
+        self.net.blobs["img0"].data[...] = self.input_data[0]
+        self.net.blobs["img1"].data[...] = self.input_data[1]
+
+        # for blob_idx in range(self.num_blobs):
+        #     # self.input_dict[self.net.inputs[blob_idx]] = self.input_data[blob_idx]
+        #     self.net.inputs[blob_idx] = self.input_data[blob_idx]
+        #     # cv2.imshow("aaa", self.input_data[blob_idx])
+        #     # cv2.waitKey(1000)
 
         print("Setup feed dict")
 
     def __call__(self, img0, img1):
-        # setup current images
+
         self.setup_images(img0=img0, img1=img1)
-        self.read_net()
-        self.setup_model()
+
+        if not self.initialized:
+            self.read_net()
+            self.setup_model()
+            self.initialized = True
+
         self.setup_feed_dict()
 
         # obtain results
@@ -106,7 +114,7 @@ class Flow:
         while i <= 5:
             i += 1
 
-            self.net.forward(**self.input_dict)
+            self.net.forward()  # **self.input_dict)
 
             containsNaN = False
             for name in self.net.blobs:

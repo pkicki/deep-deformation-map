@@ -7,6 +7,7 @@ from flow_net.OpticalFlow import Flow
 
 import os
 
+
 def init_data_provider():
     data_provider = Producer(path="data.txt",
                              batch_size=10)
@@ -15,7 +16,7 @@ def init_data_provider():
 
 
 def init_images_provider():
-    images_provider = SequenceImagesProvider(sequence_path="shirt.mp4")
+    images_provider = SequenceImagesProvider(sequence_path="paper.mp4")
     return images_provider
 
 
