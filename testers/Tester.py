@@ -25,7 +25,6 @@ class MBTester:
         :param flow: flow matrix. Output from Caffe model.
         :return: RGB matrix representing optical flow
         """
-        print(flow.shape)
         (h, w) = flow.shape[0:2]
         du = flow[:, :, 0]
         dv = flow[:, :, 1]
@@ -96,7 +95,6 @@ class MBTester:
                 frame = self.data_provider()
                 if cnt > 0:
                     return_img = self.flownet_provider(img0=previous_frame, img1=frame)
-
 
                 previous_frame = frame
                 cnt = 1
