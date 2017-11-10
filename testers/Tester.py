@@ -19,7 +19,12 @@ class MBTester:
 
     @staticmethod
     def flow2rgb_optflowtoolkit(self, flow):
-
+        """
+        Take flow matrix and ancode it as RGB.
+        :param self:
+        :param flow: flow matrix. Output from Caffe model.
+        :return: RGB matrix representing optical flow
+        """
         print(flow.shape)
         (h, w) = flow.shape[0:2]
         du = flow[:, :, 0]
@@ -50,7 +55,12 @@ class MBTester:
 
     @staticmethod
     def flowflow2rgb_handcraft(self, flow):
-
+        """
+        Take flow matrix and ancode it as RGB.
+        :param self:
+        :param flow: flow matrix. Output from Caffe model.
+        :return: RGB matrix representing optical flow
+        """
         # split flow into channels
         b_channel, g_channel = cv2.split(flow)
 
@@ -64,10 +74,14 @@ class MBTester:
         return return_img
 
     def test(self):
-
+        """
+        Wrapper for user-specified testing methods. Available: human, file and flownet.
+        TODO: Add testing flownet + my net
+        :return:
+        """
         if self.test_method == "flownet":
 
-            # setup reference image
+            # setup flownet2.0 and test it -- CAFFE
             cnt = 0
             previous_frame = np.zeros(0)
             while True:
@@ -81,22 +95,15 @@ class MBTester:
 
                 frame = self.data_provider()
                 if cnt > 0:
-                    # TODO: convert return_img (320x240x2 -> 320x240x3) and normalize
                     return_img = self.flownet_provider(img0=previous_frame, img1=frame)
-                    return_img = self.flowflow2rgb_handcraft(self, return_img)
 
-                    # output = cv2.normalize(return_img, return_img, 0, 255, cv2.NORM_MINMAX)
-                    cv2.imshow("b_channel", return_img)
-                    cv2.waitKey(10000)
 
                 previous_frame = frame
                 cnt = 1
 
-            # name = "{}frame_{:03d}.jpg".format(self.output_path, frame_no)
-            # cv2.imwrite(name, return_img)
-
         else:
 
+            # setup session -- TENSORFLOW
             with tf.Session() as sess:
                 saver = tf.train.import_meta_graph(self.net_name)
                 saver.restore(sess, tf.train.latest_checkpoint('./'))
@@ -134,7 +141,6 @@ class MBTester:
 
                         return_img = sess.run(output1[0], feed_dict={input1: [ref_img], input2: [frame]}) * self.display_threshold
 
-                        #return_img = cv2.normalize(return_img, return_img, 0, 255, cv2.NORM_MINMAX)
                         name = "{}frame_{:03d}.jpg".format(self.output_path, frame_no)
                         cv2.imwrite(name, return_img)
 
