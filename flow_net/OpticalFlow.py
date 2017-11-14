@@ -4,7 +4,7 @@ import numpy as np
 import caffe
 import tempfile
 from math import ceil
-import cv2
+
 
 class Flow:
 
@@ -88,13 +88,6 @@ class Flow:
         # setup feed dict for cafe model
         self.net.blobs["img0"].data[...] = self.input_data[0]
         self.net.blobs["img1"].data[...] = self.input_data[1]
-
-        # for blob_idx in range(self.num_blobs):
-        #     # self.input_dict[self.net.inputs[blob_idx]] = self.input_data[blob_idx]
-        #     self.net.inputs[blob_idx] = self.input_data[blob_idx]
-        #     # cv2.imshow("aaa", self.input_data[blob_idx])
-        #     # cv2.waitKey(1000)
-
         print("Setup feed dict")
 
     def __call__(self, img0, img1):

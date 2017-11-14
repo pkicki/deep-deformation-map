@@ -4,7 +4,6 @@ from trainers.Trainer import MbTrainer
 from testers.Tester import MBTester
 from data_providers.ImagesProvider import SequenceImagesProvider
 from flow_net.OpticalFlow import Flow
-
 import os
 
 
@@ -54,6 +53,6 @@ opt_net = init_flownet_model()
 tester = MBTester(data_provider=data_img,
                   flownet_provider=opt_net,
                   net_name="trained_net.meta.meta",
-                  test_method="flownet",
+                  test_method="flow_deform",
                   output_path="../data/")
 tester.test()
