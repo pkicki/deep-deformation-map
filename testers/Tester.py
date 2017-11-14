@@ -138,59 +138,77 @@ class MBTester:
         return return_img
 
     @staticmethod
-    def decode_flownet_output(self, flow):
+    def decode_flownet_output(self, flow, image):
         """
         Decode flownet2.0 output to angle and distance of pixel displacement.
+        :param image:
         :param self:
         :param flow: output from flownet2.0
         :return:
         """
+        UNKNOWN_FLOW_THRESH = 1e7
+
         u = flow[:, :, 0]
         v = flow[:, :, 1]
-        angles = np.arctan2(-u, -v) / np.pi
+
+        idxUnknow = (abs(u) > UNKNOWN_FLOW_THRESH) | (abs(v) > UNKNOWN_FLOW_THRESH)
+        u[idxUnknow] = 0
+        v[idxUnknow] = 0
+
+        rad = np.sqrt(u ** 2 + v ** 2)
+        maxrad = max(-1, np.max(rad))
+
+        u = u / (maxrad + np.finfo(float).eps)
+        v = v / (maxrad + np.finfo(float).eps)
+
+        radians = np.arctan2(-u, -v)
         magnitudes = np.sqrt(u ** 2 + v ** 2)
 
-        return angles, magnitudes
+        return radians, magnitudes
 
-    def update_mask(self, angles, magnitudes):
+    def update_mask(self, radians, magnitudes):
         """
         Update mask to track using flownet2.0.
+        :param radians:
         :param angles: angles of pixels
         :param magnitudes: distance of pixel displacement towards angle
         :return:
         """
-        assert(angles.shape == magnitudes.shape)
+        assert(radians.shape == magnitudes.shape)
 
         print("\nRegion to be tracked: ")
         for i in range(len(self.mask)):
+
+            height = self.reference_frame.shape[0]
+            width = self.reference_frame.shape[1]
 
             # get mask indexes
             idy = self.mask[i][0]
             idx = self.mask[i][1]
 
-            if idx >= self.reference_frame.shape[1]:
-                idx = self.reference_frame.shape[1] - 1
-            if idy >= self.reference_frame.shape[0]:
-                idy = self.reference_frame.shape[0] - 1
-
-            print("Old point: %d, %d" % (idx, idy))
+            # check indexes
+            if idx >= width:
+                idx = width - 1
+            if idy >= height:
+                idy = height - 1
 
             # get parameters of displacement
-            angle = angles[idx, idy]
-            displ = magnitudes[idx, idy]
+            radian = radians[idy, idx]
+            displ = magnitudes[idy, idx]
+            print("Point moved by: %f px at %f radians." % (displ, radian))
 
+            # TODO: fix it!
             # compute new positions
-            new_x = idx + displ * (math.cos(math.radians(angle)))
-            new_y = idy + displ * (math.sin(math.radians(angle)))
+            new_x = idx + displ * math.sin(radian) * 3
+            new_y = idy + displ * math.cos(radian) * 3
 
-            if new_x >= self.reference_frame.shape[1]:
-                new_x = self.reference_frame.shape[1] - 1
-            if new_y >= self.reference_frame.shape[0]:
-                new_y = self.reference_frame.shape[0] - 1
+            if new_x >= width:
+                new_x = width - 1
+            if new_y >= height:
+                new_y = height - 1
 
             # update mask
-            self.mask[i] = (int(math.floor(new_x)), int(math.floor(new_y)))
-            print("New point: %s, %s" % (str(int(math.floor(new_x))), str(int(math.floor(new_y)))))
+            self.mask[i] = (int(new_y), int(new_x))
 
     def get_mask(self, flow, image):
         """
@@ -200,15 +218,15 @@ class MBTester:
         :return:
         """
         # compute points displacement
-        a, m = self.decode_flownet_output(self, flow)
-        self.update_mask(a, m)
+        r, m = self.decode_flownet_output(self, flow, image)
+        self.update_mask(r, m)
 
         # fill the ROI so it doesn't get wiped out when the mask is applied
         mask = np.zeros(image.shape, dtype=np.uint8)
         roi_corners = np.array([self.mask], dtype=np.int32)
         channel_count = image.shape[2]  # i.e. 3 or 4 depending on your image
         ignore_mask_color = (255,) * channel_count
-        cv2.fillPoly(mask, roi_corners, ignore_mask_color)
+        cv2.fillConvexPoly(mask, roi_corners, ignore_mask_color)
 
         return mask
 
@@ -312,19 +330,26 @@ class MBTester:
                         if cnt > 0:
 
                             # get roi using flownet
-                            return_flow = self.flownet_provider(img0=previous_frame, img1=frame)
+                            return_flow = self.flownet_provider(img0=frame, img1=previous_frame)
                             mask = self.get_mask(return_flow, frame)
 
                             # get deformations using my net
                             return_img = sess.run(output1[0], feed_dict={input1: [ref_img],
-                                                                         input2: [frame]}) * 100.0
-                            return_img = np.array(return_img, dtype=np.uint8)
+                                                                         input2: [frame]}) * 200.0
 
-                            # apply the mask
-                            masked_image = cv2.bitwise_or(frame, mask)
-                            output_image = cv2.bitwise_and(masked_image, return_img)
+                            # track object using - apply proper mask
+                            frame_masked = np.array(frame, dtype=np.float)
+                            frame_masked /= 255.0
+                            frame_masked *= .25
 
-                            cv2.imshow("kkk", output_image)
+                            mask = np.array(mask, dtype=np.float)
+                            mask /= 255.0
+
+                            return_img = np.array(return_img, dtype=np.float)
+                            return_img /= 255.0
+                            out = return_img * mask + frame_masked * (1.0 - mask)
+
+                            cv2.imshow("output", out)
 
                         previous_frame = frame
                         cnt = 1
