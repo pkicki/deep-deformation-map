@@ -103,6 +103,7 @@ class Flow:
             self.initialized = True
 
         self.setup_feed_dict()
+
         # obtain results
         print('Network forward pass using %s.' % self.args.caffemodel)
         i = 1
