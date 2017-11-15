@@ -36,6 +36,9 @@ class Flow:
         print("Set GPU mode")
         caffe.set_mode_gpu()
 
+        # print("Set GPU mode")
+        # caffe.set_mode_cpu()
+
         print("End init")
 
     def setup_images(self, img0, img1):
