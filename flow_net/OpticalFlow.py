@@ -132,6 +132,7 @@ class Flow:
 
         # scale flow net output
         # TODO: add scaling
+
         blob[:, :, 0] *= 20.0 / 1.5     # u displacement
         blob[:, :, 1] *= 20.0 / 1.5     # v displacement
         return blob
