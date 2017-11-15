@@ -27,8 +27,9 @@ class MBTester:
 
         # self.mask = [(227, 100), (350, 106), (515, 122), (510, 250), (506, 367), (360, 350), (208, 343), (210, 180)]
         # self.mask = [(56, 25), (81, 26), (125, 30), (127, 88), (126, 91), (90, 88), (52, 85), (53, 45)]
-        self.mask = []
+        self.mask = []  # user specified mask
         self.reference_frame = np.zeros(0)
+        self.scale = 1
 
         # available testing modes
         if test_method in ["human", "file", "flownet", "flow_deform"]:
@@ -138,7 +139,7 @@ class MBTester:
         return return_img
 
     @staticmethod
-    def decode_flownet_output(self, flow, image):
+    def decode_flownet_output(self, flow):
         """
         Decode flownet2.0 output to angle and distance of pixel displacement.
         :param image:
@@ -146,23 +147,26 @@ class MBTester:
         :param flow: output from flownet2.0
         :return:
         """
+
         UNKNOWN_FLOW_THRESH = 1e7
 
         u = flow[:, :, 0]
         v = flow[:, :, 1]
 
-        idxUnknow = (abs(u) > UNKNOWN_FLOW_THRESH) | (abs(v) > UNKNOWN_FLOW_THRESH)
-        u[idxUnknow] = 0
-        v[idxUnknow] = 0
+        # remove errors in flow vectors
+        idx_unknown = (abs(u) > UNKNOWN_FLOW_THRESH) | (abs(v) > UNKNOWN_FLOW_THRESH)
+        u[idx_unknown] = 0
+        v[idx_unknown] = 0
 
-        rad = np.sqrt(u ** 2 + v ** 2)
-        maxrad = max(-1, np.max(rad))
+        # normalize to (-1, 1)
+        # rad = np.sqrt(u ** 2 + v ** 2)
+        # maxrad = max(-1, np.max(rad))
+        #
+        # u = u / (maxrad + np.finfo(float).eps)
+        # v = v / (maxrad + np.finfo(float).eps)
 
-        u = u / (maxrad + np.finfo(float).eps)
-        v = v / (maxrad + np.finfo(float).eps)
-
-        radians = np.arctan2(-u, -v)
-        magnitudes = np.sqrt(u ** 2 + v ** 2)
+        radians = np.arctan2(-u, -v)            # obtain radians
+        magnitudes = np.sqrt(u ** 2 + v ** 2)   # obtain displacement in pixels
 
         return radians, magnitudes
 
@@ -170,7 +174,6 @@ class MBTester:
         """
         Update mask to track using flownet2.0.
         :param radians:
-        :param angles: angles of pixels
         :param magnitudes: distance of pixel displacement towards angle
         :return:
         """
@@ -197,10 +200,9 @@ class MBTester:
             displ = magnitudes[idy, idx]
             print("Point moved by: %f px at %f radians." % (displ, radian))
 
-            # TODO: fix it!
             # compute new positions
-            new_x = idx + displ * math.sin(radian) * 3
-            new_y = idy + displ * math.cos(radian) * 3
+            new_x = idx + displ * math.cos(radian)
+            new_y = idy + displ * math.sin(radian)
 
             if new_x >= width:
                 new_x = width - 1
@@ -218,7 +220,7 @@ class MBTester:
         :return:
         """
         # compute points displacement
-        r, m = self.decode_flownet_output(self, flow, image)
+        r, m = self.decode_flownet_output(self, flow)
         self.update_mask(r, m)
 
         # fill the ROI so it doesn't get wiped out when the mask is applied
@@ -237,8 +239,8 @@ class MBTester:
         """
         if self.test_method == "flownet":
 
-            # setup flownet2.0 and test it -- CAFFE
-            cnt = 0
+            # setup flow net2.0 and test it -- CAFFE
+            firs_iteration_pass = False
             previous_frame = np.zeros(0)
             while True:
 
@@ -250,17 +252,18 @@ class MBTester:
                     break
 
                 frame = self.data_provider()
-                if cnt > 0:
+                if firs_iteration_pass:
                     flow = self.flownet_provider(img0=previous_frame, img1=frame)  # 240x320x2 -> HxWx2
                     a, m = self.decode_flownet_output(self, flow)
 
+                    # mass center of returned flow -- object tracking
                     # vec_lengths = self.compute_vectors_length(self, return_img)
                     # center_x, center_y = np.floor(ndimage.measurements.center_of_mass(vec_lengths))
                     # x_from, x_to, y_from, y_to = self.compute_roi(self, center_x, center_y)
                     # vis = frame[x_from:x_to, y_from:y_to]
 
                 previous_frame = frame
-                cnt = 1
+                firs_iteration_pass = True
 
         else:
 
@@ -277,11 +280,11 @@ class MBTester:
                 output1 = sess.graph.get_tensor_by_name("result_decoded/Tanh:0")
 
                 # setup needed variables
-                cnt = 0
+                firs_iteration_pass = False
                 previous_frame = np.zeros(0)
                 ref_img = self.data_provider.get_ref_frame()
 
-                # initialize mask to track using opticalflow
+                # initialize mask to track using optical flow
                 self.init_mask(ref_img)
                 assert(self.mask != [])
 
@@ -312,13 +315,16 @@ class MBTester:
                         if cv2.waitKey(1) == ord('q'):
                             break
 
-                        return_img = sess.run(output1[0], feed_dict={input1: [ref_img], input2: [frame]})
+                        return_img = sess.run(output1[0], feed_dict={input1: [ref_img],
+                                                                     input2: [frame]})
                         cv2.imshow("output", return_img)
 
                     # just tensorflow output - sequence -> save to files
                     if self.test_method == "file":
 
-                        return_img = sess.run(output1[0], feed_dict={input1: [ref_img], input2: [frame]}) * self.display_threshold
+                        return_img = sess.run(output1[0], feed_dict={input1: [ref_img],
+                                                                     input2: [frame]}) * self.display_threshold
+
                         name = "{}frame_{:03d}.jpg".format(self.output_path, frame_no)
                         cv2.imwrite(name, return_img)
 
@@ -327,31 +333,35 @@ class MBTester:
 
                         frame = self.data_provider()
 
-                        if cnt > 0:
+                        if firs_iteration_pass:
 
                             # get roi using flownet
-                            return_flow = self.flownet_provider(img0=frame, img1=previous_frame)
+                            return_flow = self.flownet_provider(img0=frame,
+                                                                img1=previous_frame)
                             mask = self.get_mask(return_flow, frame)
 
                             # get deformations using my net
                             return_img = sess.run(output1[0], feed_dict={input1: [ref_img],
-                                                                         input2: [frame]}) * 200.0
+                                                                         input2: [frame]})
+                            return_img = np.array(return_img) * self.display_threshold   # generic scaling
 
-                            # track object using - apply proper mask
+                            # track object using flow net - apply proper mask
+                            # scale images to float 0 - 1 for easier math
                             frame_masked = np.array(frame, dtype=np.float)
                             frame_masked /= 255.0
-                            frame_masked *= .25
+                            frame_masked *= .25  # transparency
 
                             mask = np.array(mask, dtype=np.float)
                             mask /= 255.0
 
                             return_img = np.array(return_img, dtype=np.float)
                             return_img /= 255.0
-                            out = return_img * mask + frame_masked * (1.0 - mask)
 
+                            # apply mask
+                            out = return_img * mask + frame_masked * (1.0 - mask)
                             cv2.imshow("output", out)
 
                         previous_frame = frame
-                        cnt = 1
+                        firs_iteration_pass = True
 
                 print("Tests finished!")

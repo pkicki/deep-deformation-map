@@ -126,18 +126,9 @@ class Flow:
 
         # obtain result
         blob = np.squeeze(self.net.blobs['predict_flow_final'].data).transpose(1, 2, 0)
+
+        # scale flow net output
+        # TODO: add scaling
+        blob[:, :, 0] *= 20.0 / 1.5     # u displacement
+        blob[:, :, 1] *= 20.0 / 1.5     # v displacement
         return blob
-
-
-# def writeFlow(name, flow):
-#     f = open(name, 'wb')
-#     f.write('PIEH'.encode('utf-8'))
-#     np.array([flow.shape[1], flow.shape[0]], dtype=np.int32).tofile(f)
-#     flow = flow.astype(np.float32)
-#     flow.tofile(f)
-#     f.flush()
-#     f.close()
-#
-#
-# blob = Flow.run()
-# writeFlow(args.out, blob)
