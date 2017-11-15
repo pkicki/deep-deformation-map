@@ -109,7 +109,6 @@ class Flow:
         i = 1
         while i <= 5:
             i += 1
-
             self.net.forward()  # **self.input_dict)
 
             containsNaN = False
