@@ -55,4 +55,6 @@ tester = MBTester(data_provider=data_img,
                   net_name="trained_net.meta.meta",
                   test_method="flow_deform",
                   output_path="../data/")
+
 tester.test()
+
