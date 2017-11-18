@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.colors as cl
 import math
 from scipy import ndimage
+import csv
 
 
 class MBTester:
@@ -74,11 +75,30 @@ class MBTester:
             if key == ord("r"):
                 self.reference_frame = clone.copy()
 
+            if key == ord("s"):
+                self.save_mask()
+
+            if key == ord("l"):
+                self.load_mask()
+
             # if the 'c' key is pressed, break from the loop
             elif key == ord("c"):
                 break
 
         cv2.destroyAllWindows()
+
+    def save_mask(self):
+        with open("last_mask.tsv", "wb") as f:
+            writer = csv.writer(f, delimiter="\t")
+            writer.writerows(self.mask)
+            print("Mask saved")
+
+    def load_mask(self):
+        with open("last_mask.tsv", "rb") as f:
+            reader = csv.reader(f, delimiter="\t")
+            self.mask = [(int(point[0]), int(point[1])) for point in reader]
+            print("Mask loaded")
+
 
     @staticmethod
     def compute_vectors_length(self, mat):

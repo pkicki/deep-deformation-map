@@ -99,3 +99,9 @@ ENV/
 
 # mypy
 .mypy_cache/
+
+# mask files
+*.tsv
+
+# inits needed for python2
+__init__.py
