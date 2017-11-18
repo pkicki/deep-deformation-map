@@ -200,9 +200,12 @@ class MBTester:
             displ = magnitudes[idy, idx]
             print("Point moved by: %f px at %f radians." % (displ, radian))
 
-            # compute new positions
-            new_x = idx + displ * math.cos(radian)
-            new_y = idy + displ * math.sin(radian)
+            # compute new positions taking into consideration that coordinates are rotated by +pi/2
+            # TODO consider if it is enough to get good transform and fix if not
+            bias = 0.04
+            new_x = idx + displ * math.sin(radian + bias)
+            new_y = idy + displ * math.cos(radian + bias)
+
 
             if new_x >= width:
                 new_x = width - 1
@@ -210,7 +213,7 @@ class MBTester:
                 new_y = height - 1
 
             # update mask
-            self.mask[i] = (int(new_y), int(new_x))
+            self.mask[i] = (int(round(new_y)), int(round(new_x)))
 
     def get_mask(self, flow, image):
         """
