@@ -5,6 +5,11 @@ from testers.Tester import MBTester
 from data_providers.ImagesProvider import SequenceImagesProvider
 from flow_net.OpticalFlow import Flow
 import os
+from argparse import ArgumentParser
+
+parser = ArgumentParser("Description to add")
+parser.add_argument("model", help="Specify model, for example: SD, css-ft-sd, CSS", default="s")
+args = parser.parse_args()
 
 
 def init_data_provider():
@@ -22,9 +27,9 @@ def init_images_provider():
 def init_flownet_model():
 
     class Args:
-        deployproto = "FlowNet2-s_deploy.prototxt"
+        deployproto = "models/FlowNet2-" + args.model + "_deploy.prototxt.template"
         verbose = False
-        caffemodel = "FlowNet2-s_weights.caffemodel"
+        caffemodel = "models/FlowNet2-" + args.model + "_weights.caffemodel"
         gpu = 0
         out = "result.flo"
 
