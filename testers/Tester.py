@@ -193,6 +193,11 @@ class MBTester:
         radians = np.arctan2(-u, -v)            # obtain radians
         magnitudes = np.sqrt(u ** 2 + v ** 2)   # obtain displacement in pixels
 
+        # magnitudes thresholding
+        max_magnitude = np.max(magnitudes)
+        magnitudes = np.where(magnitudes > max_magnitude/3, magnitudes, 0)
+        magnitudes = np.where(magnitudes < 30, magnitudes, 0)
+
         H, W = magnitudes.shape
 
         magnitudes_shifted = np.zeros((H, W))
