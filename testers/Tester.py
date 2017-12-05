@@ -53,10 +53,11 @@ class MBTester:
         :return:
         """
         if event == cv2.EVENT_LBUTTONDOWN:
-            point = (x, y)
-            self.mask.append(point)
-            self.mask_float.append(point)
-            cv2.circle(self.reference_frame, point, 5, (0, 0, 255), -1)
+            point_cv = (x, y)
+            point_py = (y, x)
+            self.mask.append(point_py)
+            self.mask_float.append(point_py)
+            cv2.circle(self.reference_frame, point_cv, 5, (0, 0, 255), -1)
 
     def init_mask(self, image):
         """
@@ -227,6 +228,7 @@ class MBTester:
 
             height = self.reference_frame.shape[0]
             width = self.reference_frame.shape[1]
+            print("height %d, width %d" % (height, width))
 
             # get mask indexes
             idy = self.mask[i][0]
@@ -243,7 +245,7 @@ class MBTester:
             # get parameters of displacement
             radian = radians[idy, idx]
             displ = magnitudes[idy, idx]
-            print("Point moved by: %f px at %f radians." % (displ, radian))
+            print("Point (%d, %d) moved by: %f px at %f radians." % (idx, idy, displ, radian))
 
             # compute new positions taking into consideration that coordinates are rotated by +pi/2
             # TODO consider if it is enough to get good transform and fix if not
@@ -274,7 +276,8 @@ class MBTester:
 
         # fill the ROI so it doesn't get wiped out when the mask is applied
         mask = np.zeros(image.shape, dtype=np.uint8)
-        roi_corners = np.array([self.mask], dtype=np.int32)
+        mask_T = [ (y, x) for x, y in self.mask ]
+        roi_corners = np.array([mask_T], dtype=np.int32)
         channel_count = image.shape[2]  # i.e. 3 or 4 depending on your image
         ignore_mask_color = (255,) * channel_count
         cv2.fillConvexPoly(mask, roi_corners, ignore_mask_color)
