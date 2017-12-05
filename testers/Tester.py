@@ -3,8 +3,10 @@ import cv2
 import numpy as np
 import matplotlib.colors as cl
 import math
+from math import sin, cos
 from scipy import ndimage
 import csv
+from matplotlib import pyplot as plt
 
 
 class MBTester:
@@ -29,6 +31,7 @@ class MBTester:
         # self.mask = [(227, 100), (350, 106), (515, 122), (510, 250), (506, 367), (360, 350), (208, 343), (210, 180)]
         # self.mask = [(56, 25), (81, 26), (125, 30), (127, 88), (126, 91), (90, 88), (52, 85), (53, 45)]
         self.mask = []  # user specified mask
+        self.mask_float = [] # continous mask
         self.reference_frame = np.zeros(0)
         self.scale = 1
 
@@ -52,6 +55,7 @@ class MBTester:
         if event == cv2.EVENT_LBUTTONDOWN:
             point = (x, y)
             self.mask.append(point)
+            self.mask_float.append(point)
             cv2.circle(self.reference_frame, point, 5, (0, 0, 255), -1)
 
     def init_mask(self, image):
@@ -97,6 +101,7 @@ class MBTester:
         with open("last_mask.tsv", "rb") as f:
             reader = csv.reader(f, delimiter="\t")
             self.mask = [(int(point[0]), int(point[1])) for point in reader]
+            self.mask_float = [x[:] for x in self.mask]
             print("Mask loaded")
 
 
@@ -188,7 +193,20 @@ class MBTester:
         radians = np.arctan2(-u, -v)            # obtain radians
         magnitudes = np.sqrt(u ** 2 + v ** 2)   # obtain displacement in pixels
 
-        return radians, magnitudes
+        H, W = magnitudes.shape
+
+        magnitudes_shifted = np.zeros((H, W))
+        radians_shifted = np.zeros((H, W))
+
+        for i in range(H):
+            for k in range(W):
+                new_x = k + int(round(magnitudes[i][k] * sin(radians[i][k])))
+                new_y = i + int(round(magnitudes[i][k] * cos(radians[i][k])))
+                if new_x < W and new_x >= 0 and new_y < H and new_y >= 0:
+                    magnitudes_shifted[new_y][new_x] = magnitudes[i][k]
+                    radians_shifted[new_y][new_x] = radians[i][k]
+
+        return radians_shifted, magnitudes_shifted
 
     def update_mask(self, radians, magnitudes):
         """
@@ -208,6 +226,8 @@ class MBTester:
             # get mask indexes
             idy = self.mask[i][0]
             idx = self.mask[i][1]
+            idy_float = self.mask_float[i][0]
+            idx_float = self.mask_float[i][1]
 
             # check indexes
             if idx >= width:
@@ -223,8 +243,8 @@ class MBTester:
             # compute new positions taking into consideration that coordinates are rotated by +pi/2
             # TODO consider if it is enough to get good transform and fix if not
             bias = 0.04
-            new_x = idx + displ * math.sin(radian + bias)
-            new_y = idy + displ * math.cos(radian + bias)
+            new_x = idx_float + displ * math.sin(radian + bias)
+            new_y = idy_float + displ * math.cos(radian + bias)
 
 
             if new_x >= width:
@@ -234,6 +254,7 @@ class MBTester:
 
             # update mask
             self.mask[i] = (int(round(new_y)), int(round(new_x)))
+            self.mask_float[i] = (new_y, new_x)
 
     def get_mask(self, flow, image):
         """
@@ -264,7 +285,9 @@ class MBTester:
 
             # setup flow net2.0 and test it -- CAFFE
             firs_iteration_pass = False
-            previous_frame = np.zeros(0)
+            previous_frame = self.data_provider()
+            i = 1
+            r = 7
             while True:
 
                 if cv2.waitKey(1) == ord('s'):
@@ -275,9 +298,25 @@ class MBTester:
                     break
 
                 frame = self.data_provider()
-                if firs_iteration_pass:
+                if firs_iteration_pass and i%r == 0:
                     flow = self.flownet_provider(img0=previous_frame, img1=frame)  # 240x320x2 -> HxWx2
                     a, m = self.decode_flownet_output(self, flow)
+
+                    plt.figure()
+                    plt.subplot(2, 2, 1)
+                    plt.imshow(previous_frame)
+                    plt.subplot(2, 2, 2)
+                    plt.imshow(frame)
+                    plt.subplot(2, 2, 3)
+                    plt.imshow(a)
+                    plt.subplot(2, 2, 4)
+                    plt.imshow(m)
+                    plt.draw()
+                    plt.waitforbuttonpress()
+                    #plt.pause(0.1)
+                    plt.close()
+
+                    previous_frame = frame
 
                     # mass center of returned flow -- object tracking
                     # vec_lengths = self.compute_vectors_length(self, return_img)
@@ -285,8 +324,9 @@ class MBTester:
                     # x_from, x_to, y_from, y_to = self.compute_roi(self, center_x, center_y)
                     # vis = frame[x_from:x_to, y_from:y_to]
 
-                previous_frame = frame
+                cv2.imshow("output", frame)
                 firs_iteration_pass = True
+                i += 1
 
         else:
 
@@ -304,12 +344,16 @@ class MBTester:
 
                 # setup needed variables
                 firs_iteration_pass = False
-                previous_frame = np.zeros(0)
+                first_out = False
+                previous_frame = self.data_provider()#np.zeros(0)
                 ref_img = self.data_provider.get_ref_frame()
 
                 # initialize mask to track using optical flow
                 self.init_mask(ref_img)
                 assert(self.mask != [])
+
+                i = 1
+                r = 3
 
                 # run tracking using specified test method
                 while True:
@@ -356,7 +400,7 @@ class MBTester:
 
                         frame = self.data_provider()
 
-                        if firs_iteration_pass:
+                        if firs_iteration_pass and i % r == 0:
 
                             # get roi using flownet
                             return_flow = self.flownet_provider(img0=frame,
@@ -382,9 +426,20 @@ class MBTester:
 
                             # apply mask
                             out = return_img * mask + frame_masked * (1.0 - mask)
+                            first_out = True
+
+                            a, m = self.decode_flownet_output(self, return_flow)
+
+                            plt.imshow(m)
+                            plt.draw()
+                            plt.pause(0.1)
+
+                        if first_out:
                             cv2.imshow("output", out)
 
-                        previous_frame = frame
+                        if i % r == 0:
+                            previous_frame = frame
                         firs_iteration_pass = True
+                        i += 1
 
                 print("Tests finished!")

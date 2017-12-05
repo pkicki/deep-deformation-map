@@ -29,7 +29,7 @@ def init_flownet_model():
     class Args:
         deployproto = "models/FlowNet2-" + args.model + "_deploy.prototxt.template"
         verbose = False
-        caffemodel = "models/FlowNet2-" + args.model + "_weights.caffemodel"
+        caffemodel = "models/FlowNet2-" + args.model + "_weights.caffemodel.h5"
         gpu = 0
         out = "result.flo"
 
