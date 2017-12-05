@@ -204,6 +204,8 @@ class MBTester:
         magnitudes_shifted = np.zeros((H, W))
         radians_shifted = np.zeros((H, W))
 
+
+        ### TODO (shame!) try with vectorized version
         for i in range(H):
             for k in range(W):
                 new_x = k + int(round(magnitudes[i][k] * sin(radians[i][k])))
@@ -243,8 +245,10 @@ class MBTester:
                 idy = height - 1
 
             # get parameters of displacement
-            radian = radians[idy, idx]
-            displ = magnitudes[idy, idx]
+            rx = 5
+            ry = 5
+            radian = np.mean(radians[idy-ry:idy+ry, idx-rx:idx+rx])
+            displ = np.mean(magnitudes[idy-ry:idy+ry, idx-rx:idx+rx])
             print("Point (%d, %d) moved by: %f px at %f radians." % (idx, idy, displ, radian))
 
             # compute new positions taking into consideration that coordinates are rotated by +pi/2
